@@ -23,6 +23,50 @@ BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
 CAS_RE = re.compile(r"\b\d{2,7}-\d{2}-\d\b")
 
+HIT_COLUMNS = [
+    "No.",
+    "Prop 65 chemical / evaluation item",
+    "CAS No.",
+    "Exact IMDS material name",
+    "Component / location in IMDS",
+    "IMDS evidence summary",
+    "Prop 65 status / rule point",
+    "Final Decision",
+    "Recommended support document / note",
+    "Recommended External Position",
+    "Rule Category",
+    "Context Inference",
+    "Page",
+    "Raw Line",
+]
+
+FINAL_COLUMNS = [
+    "No.",
+    "Prop 65 chemical / evaluation item",
+    "CAS No.",
+    "Exact IMDS material name",
+    "Component / location in IMDS",
+    "IMDS evidence summary",
+    "Prop 65 status / rule point",
+    "Final Decision",
+    "Recommended support document / note",
+]
+
+EXTRACT_COLUMNS = [
+    "Page",
+    "Component / location in IMDS",
+    "Exact IMDS material name",
+    "CAS No.",
+    "Raw Line",
+]
+
+PREVIEW_COLUMNS = [
+    "Prop 65 chemical / evaluation item",
+    "CAS No.",
+    "Component / location in IMDS",
+    "Final Decision",
+]
+
 
 def normalize_text(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
@@ -146,7 +190,7 @@ def parse_hits(pages: List[str], rules_df: pd.DataFrame) -> pd.DataFrame:
                     "Raw Line": line,
                 })
 
-    return pd.DataFrame(hits)
+    return pd.DataFrame(hits, columns=HIT_COLUMNS)
 
 
 def summarize_hits(hits_df: pd.DataFrame, meta: Dict[str, str]) -> pd.DataFrame:
@@ -268,13 +312,8 @@ def build_workbook(meta: Dict[str, str], summary_df: pd.DataFrame, hits_df: pd.D
 
     # Final Assessment
     ws = wb.create_sheet("2_Prop65_Final_Assessment")
-    final_cols = [
-        "No.", "Prop 65 chemical / evaluation item", "CAS No.", "Exact IMDS material name",
-        "Component / location in IMDS", "IMDS evidence summary", "Prop 65 status / rule point",
-        "Final Decision", "Recommended support document / note"
-    ]
-    ws.append(final_cols)
-    final_df = hits_df[final_cols].copy()
+    ws.append(FINAL_COLUMNS)
+    final_df = hits_df.reindex(columns=FINAL_COLUMNS)
     for _, row in final_df.iterrows():
         ws.append(list(row.values))
     style_header(ws)
@@ -300,9 +339,8 @@ def build_workbook(meta: Dict[str, str], summary_df: pd.DataFrame, hits_df: pd.D
 
     # CAS Extract
     ws = wb.create_sheet("4_IMDS_CAS_Extract")
-    extract_cols = ["Page", "Component / location in IMDS", "Exact IMDS material name", "CAS No.", "Raw Line"]
-    ws.append(extract_cols)
-    for _, row in hits_df[extract_cols].iterrows():
+    ws.append(EXTRACT_COLUMNS)
+    for _, row in hits_df.reindex(columns=EXTRACT_COLUMNS).iterrows():
         ws.append(list(row.values))
     style_header(ws)
     style_body(ws, row_height=34)
@@ -384,15 +422,13 @@ if pdf_file and rule_file:
     st.dataframe(summary_df, use_container_width=True)
 
     st.subheader("Preview - Matched Chemicals")
-    st.dataframe(
-        hits_df[[
-            "Prop 65 chemical / evaluation item",
-            "CAS No.",
-            "Component / location in IMDS",
-            "Final Decision"
-        ]].head(20),
-        use_container_width=True,
-    )
+    if hits_df.empty:
+        st.info("No CAS hits matched the uploaded rule workbook.")
+    else:
+        st.dataframe(
+            hits_df.reindex(columns=PREVIEW_COLUMNS).head(20),
+            use_container_width=True,
+        )
 
     st.download_button(
         "Download Excel Report",
