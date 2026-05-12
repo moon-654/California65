@@ -1,0 +1,8 @@
+services:
+  prop65-imds:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      PORT: "8501"
+    restart: unless-stopped
